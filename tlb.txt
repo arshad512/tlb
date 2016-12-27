@@ -1,0 +1,63 @@
+The Lustre Book.
+Hacker's Guide to Lustre Filesystem.
+=====================================
+Arshad Hussain arshad.super@gmail.com
+=====================================
+
+
+Lustre FS from 100 feet. Design and how individual components interacts.
+
+
+   	    -----------------------------
+            |       MGS/MDS Module      |
+            |                           |
+            |        -----------        |
+            |MGT01 <-|         |->      |
+            |MDT01 <-| Shared  |->      |
+            |  |     | Storage |     |  |
+            |  |     |         |     |  |
+            |  |     -----------     |  |
+            |  |                     |  |
+            | -----------   ----------- |
+            | |  MDS01  |   |  MDS02  | |
+            | |  Active |   | Standby | |
+            | -----------   ----------- |
+            -----------------------------
+                          | 
+-----------               |
+|         |               |
+| Clients |               |                -----------------------------
+|         | -------------------------------|        OSS Module         | 
+-----------            NETWORK             |                           |
+                                           |        -----------        |
+                                           |OST01 <-|         |->      |
+                                           |  |   <-| Shared  |-> OST02| 
+                                           |  |     | Storage |     |  |
+                                           |  |     |         |     |  |
+                                           |  |     -----------     |  |
+                                           |  |                     |  |
+                                           | -----------   ----------- |
+                                           | |  OSS01  |   |  OSS02  | |
+                                           | |  Active |   |  Active | |
+                                           | -----------   ----------- |
+                                           -----------------------------
+
+Lustre is a parallel filesystem. This means large Data to be written/read is 
+broken in smaller subset(objects or data stripes) and stored across the cluster. 
+In this process Increasing throughput as the read/write is happening. 
+
+Lustre is composed of 7 important components.
+============================================
+1 Client : Initiates data request to read/write or stat info.
+2 MGS	 : Management server - Maintains configuration.
+3 MGT	 : Management target - Target for MGS.
+4 MDS	 : Metadata server - Manages access to FS (inode, paths, permission).
+5 MDT	 : Metadata Target - These are ldiskfs formatted disk where actual 
+	   inodes/directores are stored. This holds FS Metadata data.
+6 OSS 	 : Object storage server - Manages access to FS data.
+7 OST 	 : Object storage target - That holds FS data.
+
+
+INDEX
+=====
+
