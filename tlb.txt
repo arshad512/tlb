@@ -169,4 +169,68 @@ prepared.
 take appropriate action on it
 and passes on to application.
 
+The Write Path:
+12:37:00 mrpel7 kernel: [<ffffffff81633ec4>] dump_stack+0x19/0x1b
+12:37:00 mrpel7 kernel: [<ffffffffa10aa0e7>] vvp_io_fini+0x337/0x830 [lustre]
+12:37:00 mrpel7 kernel: [<ffffffffa0afdf42>] ? lov_io_fini+0x282/0x460 [lov]
+12:37:00 mrpel7 kernel: [<ffffffffa0683c25>] cl_io_fini+0x75/0x240 [obdclass]
+12:37:00 mrpel7 kernel: [<ffffffffa105b64c>] ll_file_io_generic+0x2fc/0xb00 [lustre]
+12:37:00 mrpel7 kernel: [<ffffffffa105c12d>] ll_file_aio_write+0x12d/0x1f0 [lustre]
+12:37:00 mrpel7 kernel: [<ffffffffa105c2be>] ll_file_write+0xce/0x1e0 [lustre]
+12:37:00 mrpel7 kernel: [<ffffffff811de5fd>] vfs_write+0xbd/0x1e0
+12:37:00 mrpel7 kernel: [<ffffffff811df09f>] SyS_write+0x7f/0xe0
+12:37:00 mrpel7 kernel: [<ffffffff816448c9>] system_call_fastpath+0x16/0x1b
+
+How write works in lustre: Sample use case.
+===========================================
+
+# From client side start i/o.  Effectively we are writing 512*10 = 5120 bytes. 
+# 512 block 10 times. 
+yes 'k' | dd of=/mnt/lustre/five bs=512 count=10
+
+# Get name of file; its FID and intent of open/create flags.
+00000002:00010000:0.0:1463692949.850728:0:20027:0:(mdc_locks.c:1260:mdc_intent_lock()) (name: five,[0x200000400:0x1:0x0]) in obj [0x200000007:0x1:0x0], intent: open|creat flags 0101102
+
+# Starts with vvp_io_write_start() 
+00000080:00200000:0.0:1463692949.851794:0:20027:0:(vvp_io.c:806:vvp_io_write_start()) write: nob 512, result: 512
+
+# Take extent lock on range. 
+# Call a write (IOT = IO type) is 1. for READ it is 0. and ll_file_io_generic 
+# has returned 512 (1 block size in our dd's case). 
+00000080:00200000:0.0:1463692949.851811:0:20027:0:(file.c:1234:ll_file_io_generic()) iot: 1, result: 512
+
+# Start CLIO - This will loop until done, and pass it to OSC where RPC will
+# be created and send to server.
+00000020:00200000:0.0:1463692949.851815:0:20027:0:(cl_io.c:238:cl_io_rw_init()) header@ffff880010162d20[0x0, 3, [0x200000400:0x1:0x0] hash]
+
+# Identify the range to write
+00000020:00200000:0.0:1463692949.851815:0:20027:0:(cl_io.c:238:cl_io_rw_init()) io range: 1 [3584, 4096) 0 0
+
+#  Start write
+00000080:00200000:0.0:1463692949.851834:0:20027:0:(vvp_io.c:791:vvp_io_write_start()) write: [3584, 4096)
+
+# Write starts with ll_write_begin()
+# Here 3584 is Where it will start the write and 512 is len of the write 
+(in dd's case its block size of 512)
+00000080:00200000:0.0:1463692949.851835:0:20027:0:(rw26.c:548:ll_write_begin()) Writing 0 of 3584 to 512 bytes
+
+# Write ends with ll_write_end(). Queued page 1 is indication that one block is 
+# written/queued. In our dd's case its 512 bytes. Suppose the block size was 8192; 
+# then the page size is divided by block size = 8192/4096=2 and the write pages 
+# will be queued 2 (or looped twice in this case).
+00000080:00200000:0.0:1463692949.851842:0:20027:0:(rw26.c:677:ll_write_end()) queued page: 1.
+
+# commit write (or queue write) - Async page is submitted for write. 
+# Remember sync write would be different and written directly.
+00000080:00200000:0.0:1463692949.851842:0:20027:0:(vvp_io.c:700:vvp_io_write_commit()) commit async pages: 1, from 3584, to 4096
+
+# Actual writes goes to disk. 
+0000080:00200000:0.0:1463692949.851843:0:20027:0:(vvp_io.c:722:vvp_io_write_commit()) Committed 1 pages 512 bytes, tot: 512
+
+# Finally update the inode with newly written size by calling ll_merge_lvb
+00000080:00200000:0.0:1463692949.851844:0:20027:0:(file.c:1049:ll_merge_lvb()) [0x200000400:0x1:0x0] updating i_size 4096
+
+# ll_file_io_generic() - call to write sys call looks like this. returns bytes written or -1.
+# Starts with ppos = 0; and it should increment by 512 as dd would be writing it in 512 bytes chunks.
+
 
