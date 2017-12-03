@@ -233,4 +233,96 @@ yes 'k' | dd of=/mnt/lustre/five bs=512 count=10
 # ll_file_io_generic() - call to write sys call looks like this. returns bytes written or -1.
 # Starts with ppos = 0; and it should increment by 512 as dd would be writing it in 512 bytes chunks.
 
+Mapping Inode to Data
+=====================
+
+This form of debugging is required when there is suspicion that the layout is
+corrupted. Given just the pathname we could get the data contents. This type
+of debugging also verifies the metadata (inode) correctly mapps to data.
+
+# Given just the pathname.
+[root@mrpel7 lustre-release]# stat /mnt/lustre/five
+File: '/mnt/lustre/five'
+Size: 9             Blocks: 1          IO Block: 4194304 regular file
+Device: 2c54f966h/743766374d    Inode: 144115205272502273  Links: 1
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2017-12-03 17:26:20.000000000 +0530
+Modify: 2017-12-03 17:26:36.000000000 +0530
+Change: 2017-12-03 17:26:36.000000000 +0530
+Birth: -
+
+
+# Get object-id of the file
+[root@mrpel7 lustre-release]# lfs getstripe /mnt/lustre/five
+/mnt/lustre/five
+lmm_stripe_count:  1
+lmm_stripe_size:   1048576
+lmm_pattern:       raid0
+lmm_layout_gen:    0
+lmm_stripe_offset: 0
+	obdidx		 objid		 objid		 group
+	     0	             2	          0x2	             0
+
+# Get number of OST's. File 'five' object could be in any OST.
+[root@mrpel7 lustre-release]# mount | grep lustre-ost | cut -d' ' -f1
+/tmp/lustre-ost1
+/tmp/lustre-ost2
+
+# Find the backing disk mapping. Object 2 will be either under /dev/loop1 or 
+# /dev/loop2.
+[root@mrpel7 lustre-release]# losetup -a
+/dev/loop0: [2050]:2762852 (/tmp/lustre-mdt1)
+/dev/loop1: [2050]:2762853 (/tmp/lustre-ost1)
+/dev/loop2: [2050]:2762854 (/tmp/lustre-ost2)
+
+# Lustre keeps striping info in EA of the inodes. EA contains the list of all 
+# object ID and object index (OST index) Lustre uses object id as file name. 
+# If object-id is 'X'. The formula is O/0/d$((X % 32))/X to get the extents.
+# In this example we replace 'X' with 2.
+[root@mrpel7 lustre-release]# debugfs -c -R "stat O/0/d$((2 % 32))/2" /dev/loop1
+debugfs 1.42.13.wc4 (28-Nov-2015)
+/dev/loop1: catastrophic mode - not reading inode or group bitmaps
+Inode: 101   Type: regular    Mode:  0666   Flags: 0x80000
+Generation: 3829217146    Version: 0x00000001:00000002
+User:     0   Group:     0   Size: 9
+File ACL: 0    Directory ACL: 0
+Links: 1   Blockcount: 8
+Fragment:  Address: 0    Number: 0    Size: 0
+ctime: 0x5a23e674:00000000 -- Sun Dec  3 17:26:36 2017
+atime: 0x5a23e664:00000000 -- Sun Dec  3 17:26:20 2017
+mtime: 0x5a23e674:00000000 -- Sun Dec  3 17:26:36 2017
+crtime: 0x5a23e63f:c93ffc9c -- Sun Dec  3 17:25:43 2017
+Size of extra inode fields: 32
+Extended attributes stored in inode body:
+invalid EA entry in inode
+EXTENTS:
+(0):33113
+
+# We now know the inode to be 101! and block to be 33113
+
+# We could also use 'blocks' subcommand with inode to get the blocks.
+[root@mrpel7 lustre-release]# debugfs -c -R "blocks <101>" /dev/loop1
+debugfs 1.42.13.wc4 (28-Nov-2015)
+/dev/loop1: catastrophic mode - not reading inode or group bitmaps
+33113
+
+# We can now 'dd' to the location and check if the contens are what 
+# we are looking at. Read from device /dev/loop1, and skip the device 33113
+# times the block size.
+# dd if=/dev/loop1 of=output_file bs=4096 count=1 skip=33113
+
+# Check the contents
+[root@mrpel7 lustre-release]# xxd output_file | head -7
+0000000: 4c75 7374 7265 4653 0a00 0000 0000 0000  LustreFS........
+0000010: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0000020: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0000030: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0000040: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0000050: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0000060: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+
+# Check the contents POSIX style
+[root@mrpel7 lustre-release]# cat /mnt/lustre/five
+LustreFS
+
 
