@@ -42,22 +42,131 @@ Lustre FS from 100 feet. Design and how individual components interacts.
                                            | -----------   ----------- |
                                            -----------------------------
 
-Lustre is a parallel filesystem. This means large Data to be written/read is 
-broken in smaller subset(objects or data stripes) and stored across the cluster. 
-In this process Increasing throughput as the read/write is happening. 
+Lustre is a distributed filesystem, where individual servers having local disk
+is tied together so they present a unified storage, working together coherently.
+Data to be written/read is broken in smaller subset(objects or data stripes) and 
+stored across the cluster.  In this process Increasing throughput as the read 
+or write is happening. 
+
 
 Lustre is composed of 7 important components.
 ============================================
-1 Client : Initiates data request to read/write or stat info.
+1 Client : Combines all the server components and gives a POSIX view of the
+	   mountable filesystem. Initiates data request to read or write.
 2 MGS	 : Management server - Maintains configuration.
 3 MGT	 : Management target - Target for MGS.
 4 MDS	 : Metadata server - Manages access to FS (inode, paths, permission).
 5 MDT	 : Metadata Target - These are ldiskfs formatted disk where actual 
 	   inodes/directores are stored. This holds FS Metadata data.
 6 OSS 	 : Object storage server - Manages access to FS data.
-7 OST 	 : Object storage target - That holds FS data.
+7 OST 	 : Object storage target - Holds actual FS data.
 
 
-INDEX
-=====
+PTLRPC
+======
+All components connect through LNET(TCP/IP or IB Abstraction) layer. RPC is 
+build on top of LNET which handles client - server communication.
+
+
+LDLM
+====
+Filesystem coherency is achieved using Lustre distributed lock manager(LDLM). 
+LDLM provides a unified view of locks to all participating server and clients.
+All access to resources(metadata, data) is serialised. LDLM works by 
+maintaining a global lock queue. Every time there is need to obtain lock, it 
+enqueues the lock to this global queue. Once the lock is relinquish by the 
+resource it is dequeued. There are three global queue - 
+1. Granted 	- Locks are successfully taken
+2. Converting 	- Locks are demoting
+3. Blocked	- Locks cannot be granted.
+LDLM uses 'call-backs' or AST to notify process that the work is done or some
+attention is required.
+
+
+Replay & Failover
+=================
+Disks are protected by RAID. Lustre have no control on them. Nodes failover (HA)
+are managed by Lustre. Heartbeat is setup between primary and secondary nodes 
+using either pacemaker or coresync. If primary fails, there is an attempt to 
+umount() primary first. If that takes long, the primary is STONITH (killed 
+forcefully).  Meanwhile secondary node is mounted. Upon successful re-connection 
+of client, it check the pending TID (Transaction ID) against the LAST_RECV and 
+replays all the TID greater than equal to TID.
+
+Client					Server
+======					======
+00. Client sends RPC Request + XID	01. Server uses XID as descriptor for 
+					completing the requested task.
+					
+					03. Server Sends back TID.
+
+04. Client queues TID. And waits
+for completion event on XID.		05. Meanwhile server executes the
+					Request.
+
+					06. After completion or failure of 
+					request. Server sends back response
+					with return status.
+07. Client check the response
+and drops the TID from the queue.
+(Job is completed)
+
+
+LLOG
+====
+Llog or lustre logs are transaction logs in Lustre. It helps in maintaining a 
+'atomic' commit during distributive transaction. For example, an unlink starts 
+at MDS and completes on OSS. It also maintains the whole cluster wide 
+configuration.
+
+
+Layout & objects
+================
+Layouts are maps which points the combination of IO offset and size to one or 
+more objects, which may or may not be residing on separate OST. Layouts are 
+kept in EA. During the time of file create or open, the MDT reads and maps 
+layout using Object Index (OI) to retrive the FID. FID now has all the 
+information to do IO independent of MDT. Objects are store house for data 
+within OST. Objects are stored in O/0/d* format on the OSTs. During the creating 
+of the file the objects can be specified in the form of 'stripe count'. This 
+until now would be frozen until the file is migrated (see pfl). If stripe count 
+is greater than 1, then part of object hold part of file. This also increase the 
+parellism while doing the actual IO. If stripe count is 1, the single object is 
+the whole file. Not a clever, layout selection in case there are lots of data 
+to be written or read. 
+
+system call path under Lustre
+=============================
+
+Client					Server
+======					======
+00. Client makes a POSIX system call	
+
+01. llite/file.c -> Entry point. Traps 
+it and does a sanity check. If not 
+sane it throws a ENOSUPRT and returns.
+
+02. llite/vvp_io.c -> Get locks on 
+range if any and initiate clio for IO.	
+(IO loops within...) and calls
+clio_end.
+
+03. Before clio_end - Call osc_io.c
+to prepare RPC and send it across to 
+server.	At this point, vvp_object 
+(inode) and cl_object (page) is 
+prepared.
+					04. Server receives RPC and does a
+					sanity check on it.
+
+					05. Through dt_object (points to ldiskfs
+					operations) invoke ldiskfs to make 
+					actual FS modification.
+
+					06. Server returns RPC.
+
+07. Client receives RPC and
+take appropriate action on it
+and passes on to application.
+
 
