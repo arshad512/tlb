@@ -1,9 +1,6 @@
-110
-# Distribution Ubuntu-18.04 (bionic). Kernel 4.9. ZFS on Single node client/server Lustre (git hash).
-
-KPATH=/root/lk_4.6
-SPLPATH=/root/zfs/spl
-ZFSPATH=/root/zfs/zfs
+# 110
+# Distribution Ubuntu-18.04 (bionic). Kernel 4.9. ZFS on Single node client/server Lustre (HEAD).
+## arshad.super@gmail.com
 
 ### get libs and dev packages
 ```
