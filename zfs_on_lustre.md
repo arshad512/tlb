@@ -2,7 +2,7 @@
 # Ubuntu-18.04 (bionic). Kernel 4.9. ZFS on Single node client/server Lustre (HEAD).
 ### arshad.super@gmail.com
 
-### get libs and dev packages
+### Get libs and dev packages
 ```
 $ apt-get install libssl-dev libelf-dev libmount-dev libext2fs-dev uuid-dev libblkid-dev dietlibc-dev
 $ apt-get install build-essential debhelper devscripts fakeroot kernel-wedge libudev-dev pciutils-dev
