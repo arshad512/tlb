@@ -1,6 +1,6 @@
 # 110
 # Ubuntu-18.04 (bionic). Kernel 4.9. ZFS on Single node client/server Lustre (HEAD).
-### arshad.super@gmail.com
+### Arshad Hussain(arshad.super@gmail.com)
 
 ### Get libs and dev packages
 ```
@@ -61,7 +61,7 @@ $ depmod -a
 $ reboot
 ```
 
-### Build lustre with zfs
+### Build Lustre with ZFS
 ```
 KPATH=/root/lk_4.6
 SPLPATH=/root/zfs/spl
