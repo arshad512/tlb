@@ -1,6 +1,6 @@
 # 110
-# Distribution Ubuntu-18.04 (bionic). Kernel 4.9. ZFS on Single node client/server Lustre (HEAD).
-## arshad.super@gmail.com
+# Ubuntu-18.04 (bionic). Kernel 4.9. ZFS on Single node client/server Lustre (HEAD).
+### arshad.super@gmail.com
 
 ### get libs and dev packages
 ```
