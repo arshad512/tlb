@@ -3,6 +3,7 @@
 ### Arshad Hussain(arshad.super@gmail.com)
 
 ### Get libs and dev packages
+These libs and devel packages are required. Better to get them upfront.
 ```
 $ apt-get install libssl-dev libelf-dev libmount-dev libext2fs-dev uuid-dev libblkid-dev dietlibc-dev
 $ apt-get install build-essential debhelper devscripts fakeroot kernel-wedge libudev-dev pciutils-dev
@@ -10,11 +11,10 @@ $ apt-get install texinfo xmlto libelf-dev python-dev liblzma-dev libaudit-dev d
 $ apt-get install module-assistant libreadline-dev dpatch libsnmp-dev quilt
 ```
 
-### Get and compile kernel (4.9.170) (Takes 3.5 hours to complete on my i5. Requries 30 gigs of space)
+### Get and compile kernel (4.9.170)
+This takes 3.5 hours to compile. This requires 30 gigs of space.
 ```
 KPATH=/root/lk_4.6
-SPLPATH=/root/zfs/spl
-ZFSPATH=/root/zfs/zfs
 
 $ mkdir -p $KPATH
 $ cd $KPATH
@@ -31,7 +31,6 @@ $ reboot
 ```
 KPATH=/root/lk_4.6
 SPLPATH=/root/zfs/spl
-ZFSPATH=/root/zfs/zfs
 
 $ mkdir -p $SPLPATH
 $ cd $SPLPATH
@@ -56,6 +55,7 @@ $ make install
 ```
 
 ### Re-creates list of module dependencies
+Not requried, however, rebooting is adviced here.
 ```
 $ depmod -a
 $ reboot
@@ -81,6 +81,7 @@ TODO
 
 ### Setup Lustre network module to load at startup
 ```
+root@lhack:~# echo "options lnet networks=tcp0(enp0s8)" >>  /etc/modprobe.d/lustre.conf
 root@lhack:~# cat /etc/modprobe.d/lustre.conf
 options lnet networks=tcp0(enp0s8)
 root@lhack:~#
@@ -96,25 +97,29 @@ root@lhack:~#
 ```
 
 ### Load modules
+If these work, we are almost done.
 ```
 $ modprobe lnet
 $ modprobe zfs
 $ modporbe lustre
 ```
 
-### Format and Mount MGS/MDS. I have used /dev/sdb1 for this.
+### Format and Mount MGS/MDS.
+/dev/sdb1 is used as device for MGS/MDS.
 ```
 $ mkdir -p /mnt/mdt
 $ mkfs.lustre --reformat --backfstype=zfs --fsname=lustre --mgsnode=10.106.9.50@tcp --mgs --mdt gpool/metadata /dev/sdb1 
 $ mount.lustre gpool/metadata /mnt/mdt
 ```
 
-### Format and Mount OST. Note I have used /dev/sdb2 for this.
+### Format and Mount OST.
+/dev/sdb2 is used as device OSS/OST
 ```
 $ mkdir -p /mnt/ost
 $ mkfs.lustre --index 0 --mgsnode=10.106.9.50@tcp --backfstype=zfs --fsname=lustre --ost gpool/data /dev/sdb2
 $ mount.lustre gpool/data /mnt/ost/
 ```
+
 ### Verify Zpool(gpool) which have been created.
 ```
 root@lhack:~/lustre_dev/lustre-release# zpool list
@@ -143,11 +148,14 @@ root@lhack:~/lustre_dev/lustre-release# dd if=/dev/zero of=/mnt/lustre/test_file
 100+0 records out
 51200 bytes (51 kB, 50 KiB) copied, 0.00113225 s, 45.2 MB/s
 root@lhack:~/lustre_dev/lustre-release#
+```
 
+```
 root@lhack:~/lustre_dev/lustre-release# ls -ali /mnt/lustre/test_file 
 144115305935798273 -rw-r--r-- 1 root root 51200 Apr 26 11:27 /mnt/lustre/test_file
 root@lhack:~/lustre_dev/lustre-release#
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# stat /mnt/lustre/test_file
  File: /mnt/lustre/test_file
  Size: 51200           Blocks: 1          IO Block: 4194304 regular file
@@ -159,17 +167,18 @@ Change::0
  2019-04-26 11:27:00.000000000 +0000
 Birth: -
 root@lhack:~/lustre_dev/lustre-release#
-
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# lfs path2fid /mnt/lustre/test_file
 [0x200001b71:0x1:0x0]
 root@lhack:~/lustre_dev/lustre-release#
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# lfs fid2path lustre 0x200001b71:0x1:0x0
 test_file
 root@lhack:~/lustre_dev/lustre-release#
-
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# lfs getstripe /mnt/lustre/test_file
 /mnt/lustre/test_file
 lmm_stripe_count:  1
@@ -181,16 +190,19 @@ lmm_stripe_offset: 0
             0              98           0x62                0
 
 root@lhack:~/lustre_dev/lustre-release#
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# lfs getsom /mnt/lustre/test_file
 file: /mnt/lustre/test_file size: 51200 blocks: 1 flags: 4
 root@lhack:~/lustre_dev/lustre-release#
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# lfs osts
 OBDS:
 0: lustre-OST0000_UUID ACTIVE
 root@lhack:~/lustre_dev/lustre-release#
-
+```
+```
 root@lhack:~/lustre_dev/lustre-release# lfs mdts
 MDTS:
 0: lustre-MDT0000_UUID ACTIVE
