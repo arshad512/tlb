@@ -69,7 +69,7 @@ ZFSPATH=/root/zfs/zfs
 
 $ git clone git://git.whamcloud.com/fs/lustre-release.git
 $ sh ./autogen.sh
-$ ./configure --disable-ldiskfs --with-linux=$KPATH/linux-4.9.170 --with-zfs=$ZFSPATH/zfs-0.7.12 --with-spl=$SPLPATH/spl-0.7.12/
+$ ./configure --enable-server --disable-ldiskfs --with-linux=$KPATH/linux-4.9.170 --with-zfs=$ZFSPATH/zfs-0.7.12 --with-spl=$SPLPATH/spl-0.7.12/
 $ make -j2
 $ make install
 ```
