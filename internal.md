@@ -1,5 +1,18 @@
 110
 
+# Lustre Gems! (Work in progress....)
+
+## Lustre programming (Lustre API)
+
+### What is a transaction
+this does not support mulitple transactions yet, only 1 update RPC each time betwee MDTs
+ 
+
+## Linux Kernel programming (Kernel API used under Lustre)
+
+- ### KIOV vs Kvec (https://review.whamcloud.com/#/c/36826/)
+
+
 LU-13004 ptlrpc: Allow BULK_BUF_KIOV to accept a kvec
 
 Bulk descriptor of type PTLRPC_BULK_BUF_KIOV are comprised
@@ -28,4 +41,13 @@ const struct ptlrpc_bulk_frag_ops ptlrpc_bulk_kiov_nopin_ops = {
 	.add_iov_frag	= ptlrpc_prep_bulk_frag_pages,
 };
 EXPORT_SYMBOL(ptlrpc_bulk_kiov_nopin_ops);
+
+=>
+LU-13004 target: use KIOV for out_handle
+
+Convert out_handle() use use a BULK_BUF_KIOV rather than
+a BULK_BUF_KVEC.
+
+This is a step towards removed KVEC support and standardizing
+on KIOV.
 
